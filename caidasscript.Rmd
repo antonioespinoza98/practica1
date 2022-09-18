@@ -1,0 +1,130 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Caídas
+
+Un estudio prospectivo busca investigar los efectos de dos intervenciones en la frecuencia de caídas en personas mayores de 65 años.  Se seleccionan 100 personas que superan los 65 años y se dividen aleatoriamente en dos grupos. A un grupo se le da una intervención consistente en explicaciones en una serie de clases `(trat=0)` y al otro grupo se le dan las mismas clases y además un entrenamiento de ejercicios aeróbicos `(trat=1)`.   Se incluyen además 3 variables de cada persona: sexo (0: mujer, 1: hombre), índice de balance  e índice de fuerza.  Durante un período de 6 meses se llevó un registro del número de caídas que cada persona tuvo.
+Los datos están en el archivo `caidas.Rdata`
+
+```{r}
+load('caidas.Rdata')
+```
+
+a.	Represente gráficamente los datos.
+
+```{r}
+base$trat = factor(base$trat)
+levels(base$trat) = c("clases", "ejercicios")
+base$sexo = factor(base$sexo)
+levels(base$sexo) = c("mujer", "hombre")
+boxplot(caidas ~ trat + sexo, data = base)
+```
+
++ Para ambos sexos, en promedio las caidas es más alto con el tratamiento que tiene solo clases que con el que también tiene ejercicios. 
+
+```{r}
+library(lattice)
+
+xyplot(
+  caidas ~ balance |
+    sexo,
+  groups = trat,
+  type = c('r', 'p'),
+  auto.key = list(columns = 2),
+  data = base
+)
+
+xyplot(
+  caidas ~ fuerza |
+    sexo,
+  groups = trat,
+  type = c('r', 'p'),
+  auto.key = list(columns = 2),
+  data = base
+)
+```
+
+
+b.	Escriba el modelo inicial.
+
+$$log(\lambda_{i,j,F,B})=\beta_0+\tau_i+\gamma_j+\beta_1Fuerza+\beta_2Balance+(\tau \gamma)_{ij}+\beta_{1,i}^*Balance+\beta_{2,i}^*Fuerza$$
+
+c.	Haga el análisis completo para determinar si hay un efecto del tratamiento.  En esta parte debe tomar en cuenta solo las interacciones que puedan tener sentido, así como covariables. Debe reducir su modelo usan las técnicas apropiadas.  Debe verificar que usa el modelo de conteo que cumpla con los supuestos.
+
+```{r}
+# Antes de hacer el modelo, veamos un poco los supuestos
+library(dplyr)
+
+base %>% group_by(trat) %>% 
+  summarise(
+    
+    media = mean(caidas),
+    varianza = var(caidas)
+  
+)
+
+mod <- glm(caidas ~ trat*(sexo + balance + fuerza), family = quasipoisson, data = base)
+
+summary(mod)$disp
+```
+
++ Podemos observar que $\phi$ = 1 lo que indica que parece no haber sobredispersión. 
+
+
+```{r}
+mod1 <- glm(caidas ~ trat*(sexo + balance + fuerza), family = poisson, data = base)
+
+library(AER)
+
+dispersiontest(mod1, trafo = 1)
+dispersiontest(mod1, trafo = 2)
+
+```
+
+```{r}
+drop1(mod1, test = 'LRT')
+
+mod1 = update(mod1, .~.-trat:sexo)
+
+drop1(mod1, test = 'LRT')
+
+mod1 = update(mod1, .~.-trat:fuerza)
+
+
+drop1(mod1, test = 'LRT')
+
+mod1 = update(mod1, .~.-trat:balance)
+
+drop1(mod1, test = 'LRT')
+```
+
+
++ En ambos casos no se rechaza la hipótesis nula de equidispersión, entonces proseguimos con el modelo Poisson.
+
+d.	Escriba el modelo final.  Aquí debe escribirlo con todos los detalles del modelo lineal generalizado y usando la simbología adecuada. Escriba el modelo en forma larga y en forma reducida.  Puede decidir si usa suma nula o tratamiento referencia, pero debe especificar claramente las restricciones.
+
+$$log(\lambda_{i,j,B,F})=\beta_0+\tau_i+\delta_j+\beta_1Balance+\beta_2Fuerza$$
+
+Siendo así, $\tau_1$ al tratamiento ejercicio, meintras que $\delta_j$ asociado al sexo con $\delta_1$ = 0 los demás coeficientes corresponden a las variables balance y fuerza. 
+
+Se asume que la distribución de Y: número de caídas, condicional al tratamiento, el sexo, el balance y la fuerza, es poisson con esperanza $\lambda_{i,j,B,F}$ con distribución $Y|i,j,B,F ~ Pois(\lambda_{i,j,B,F})$ y la función de enlance es $g(.) = log(.)$
+
+e.	De una interpretación adecuada de sus resultados.
+
+```{r}
+exp(-mod1$coefficients[2])
+```
+
++ Las personas que hacen clases solamente, tienen en promedio casi 3 más caídas que las que hacen ejercicio. 
+
+```{r}
+exp(-confint(mod1)[2,])
+```
+
++ Se puede esperar con 95 de confianza que las personas que solo hacen clases se caigan en promedio entre 2.25 y 3.8 lo que se caen quienes hacen ejercicios. 
+
+
+
