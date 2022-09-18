@@ -1,0 +1,126 @@
+---
+title: 'Palomitas'
+author: 'Marco Espinoza'
+editor_options: 
+  chunk_output_type: console
+---
+
+Se realizó un experimento para determinar el efecto de la humedad (alta, baja, normal) y del tiempo de cocción en microondas (1, 2, 3 minutos) sobre el porcentaje de palomitas de maíz que quedan sin explotar.  Se cuenta con el *número de granos que explotan* (exito) y el número que no explotan (fracaso).  El experimento se realizó en 6 diferentes microondas y en cada uno de ellos se hicieron los 9 tratamientos.  Use los datos en el archivo `palomitas.Rdata`
+
+
+```{r}
+load('palomitas.Rdata')
+library(dplyr)
+```
+
+
+a.	Cree una variable que sea la proporción de granos que explotaron en cada medición y presente un gráfico de cajas (boxplot) que permita comparar el comportamiento de la variable por tiempo de cocción. A partir del gráfico comente lo que se espera de las comparaciones.
+
+```{r}
+#viendo la base podemos notar que tenemos datos agrupados.
+
+
+base$prop = base$exito / (base$exito + base$fracaso)
+
+boxplot(prop ~ tiempo, data = base)
+
+
+boxplot(prop ~ tiempo + humedad, data = base)
+```
+
++ Parece ser que no hay interacción debido a que los tiempo de coacción se mantienen a lo largo de cantidad de humedad. 
+
+
+b.	Verifique (mediante prueba de hipótesis) si existe un efecto del tiempo de cocción sobre la proporción de granos que explotan. Debe considerar si la humedad afecta la prueba o no.
+
++ De primera entrada, primero verificar si la humedad afecta el tiempo de coacción, para eso consideramos el siguiente modelo:
+
+```{r}
+# Hay que armar la variable respuesta al ser agrupados
+mod <- lm(prop ~ tiempo*humedad + micro, data = base)
+```
+
++ Hacemos la prueba de hipótesis de no interacción
+
+$$\tau_1=\tau_2$$
+
+```{r}
+drop1(mod, test = 'F')
+```
+
++ Hay suficiente evidencia estadística para no rechazar la hipótesis de no interacción, por lo que se concluye que el tiempo de coacción no es diferente para los niveles de humedad.
+
+```{r}
+mod = update(mod, .~.-tiempo:humedad)
+```
+
+```{r}
+drop1(mod, test = 'F')
+```
+
++ Podemos concluir que efectivamente hay un efecto del tiempo en el éxito de las palomitas, con una probabilidad asociada baja. 
+
+c.	Tome ahora la variable que indica si el grano explota o no como respuesta.  Además tome como factor de diseño solamente el tiempo de cocción (no use para nada la humedad). Use el tiempo como factor.  Escriba el modelo que se debe utilizar y explique las tres partes del modelo lineal generalizado.
+
+$$log(\frac{\pi_{t,j}}{1-\pi_{t,j}})=\beta_0+\beta_1T+\tau_j$$
+
++ Enlance
+  + Que es básicamente la función $g(z)=\frac{z}{1-z}$
++ Componente aleatorio
+  + conformado por $\beta_0$,$\beta_1$ y $\tau_j$
++ Componente aleatorio
+  + $Y|n,t,j ~ Bin(n,\pi_{t,j})$
+
+d.	Obtenga las estimaciones de los coeficientes del modelo y úselos para estimar la probabilidad de que una semilla explote si se usa un tiempo de 2 minutos.  Escriba todos los cálculos necesarios.
+
+```{r}
+mod1 <- glm(cbind(exito, fracaso) ~ tiempo + micro, family = binomial, data = base)
+
+betas <- mod1$coefficients
+```
+
+```{r}
+exp(betas[1] + betas[2]) / (1 + exp(betas[1] + betas[2]))
+```
+
+e.	Haga las comparaciones entre los 3 tiempos por pares. Determine dónde hay diferencias.
+
+
+
+
+f.	Cuantifique las comparaciones que tengan sentido. Debe dar una interpretación de sus resultados.
+
+
+
+g.	Ahora haga el análisis considerando la humedad y vea si cambian los resultados.
+
+
+
+h.	Repita el análisis usando el tiempo de forma continua.
+
+
+
+i.	Haga el análisis usando como respuesta la proporción de granos que explotan en un modelo lineal normal y compare los resultados.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
