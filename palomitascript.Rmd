@@ -85,42 +85,118 @@ exp(betas[1] + betas[2]) / (1 + exp(betas[1] + betas[2]))
 
 e.	Haga las comparaciones entre los 3 tiempos por pares. Determine dónde hay diferencias.
 
+```{r}
+# veamos los coeficientes
+betas
+# En este caso tenemos que hacer comparaciones de tiempo 2 versus tiempo 3, luego tiempo 2 versus tiempo 1 y por último tiempo 3 versus tiempo 1.
 
+# armamos los contrastes
+contrasts(base$tiempo)
+tiempo1 = c(1,0,0);tiempo2 = c(1,1,0);tiempo3 = c(1,0,1)
+
+t2.t3 = tiempo2-tiempo3; t2.t1 = tiempo2 - tiempo1; t3.t1 = tiempo3 - tiempo1
+
+h = cbind(t2.t3, t2.t1, t3.t1)
+
+eta = t(h) %*% betas[1:3]
+
+# Hacemos la prueba de hipótesis
+
+ee = sqrt(diag(t(h)%*% vcov(mod1)[1:3,1:3] %*% h ))
+q = eta/ee
+
+(p=pnorm(q, lower.tail = F))
+
+p < 0.05/3 #Recordar siempre ponerle la cantidad de comparaciones
+```
+
++ Podemos observar que se cumplen las diferencias significativas para las tres comparaciones. 
 
 
 f.	Cuantifique las comparaciones que tengan sentido. Debe dar una interpretación de sus resultados.
 
+```{r}
+z = qnorm(1 - 0.05/3)
+exp(eta - z*ee)
+```
 
++ Con un 95% de confianza se puede esperar que la propensión de éxito en el tiempo 2 sea al menos 73% mayor que la del tiempo 1, y al menos 17% que la del tiempo 3, mientras que la del tiempo 3 sea al menos 14% mayor que la del tiempo 1. Realmente solo al comparar tiempo 2 contra tiempo 1 es que se observa una mayor diferencia de tiempo. 
 
 g.	Ahora haga el análisis considerando la humedad y vea si cambian los resultados.
 
+```{r}
+mod2 <- glm(cbind(exito, fracaso) ~ tiempo + micro + humedad, family = binomial, data = base)
+```
 
+```{r}
+drop1(mod2, test = 'LRT')
+```
+
++ Podemos ver que no se rechaza la hipótesis nula de que la humedad tenga un efecto en el éxito de los granos de palomitas. 
+
+```{r}
+betas <- mod2[1:3]
+(eta = t(h) %*% betas)
+
+ee = sqrt(diag(t(h)%*% vcov(mod2)[1:3,1:3] %*% h ))
+
+q = eta/ee
+(p=pnorm(q, lower.tail = F))
+
+p < 0.05/3 #Recordar siempre ponerle la cantidad de comparaciones
+
+z = qnorm(1 - 0.05/3)
+exp(eta - z*ee)
+```
+
++ Los resultados son muy similares en comparación de cuando no se incluía la humedad.
 
 h.	Repita el análisis usando el tiempo de forma continua.
 
+```{r}
 
+mod3 <- glm(cbind(exito, fracaso) ~ as.numeric(tiempo) + micro + humedad, family = binomial, data = base)
+```
+
+```{r}
+drop1(mod3, test = 'LRT')
+```
+
+```{r}
+exp(mod3$coefficients[2])
+```
+
+- Por cada aumento de un minuto la propensión aumenta un 22%. 
 
 i.	Haga el análisis usando como respuesta la proporción de granos que explotan en un modelo lineal normal y compare los resultados.
 
+```{r}
+library(car)
 
+qqPlot(mod)
 
+library(lmtest)
 
+bptest(mod2, studentize = F)
+```
 
++ Se puede asumir normalidad y homocedasticidad. 
 
+```{r}
+betas <- mod$coefficients[1:3]
 
+(eta = t(h) %*% betas)
 
+ee = sqrt(diag(t(h) %*% vcov(mod)[1:3,1:3]%*%h))
 
+q = eta/ee
 
+p=pt(q,44,lower.tail = F)
 
+p<0.05
 
+tt = qt(1-0.05/3,44)
 
-
-
-
-
-
-
-
-
-
+eta - tt*ee
+```
 
