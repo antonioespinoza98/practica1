@@ -1,0 +1,324 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# BACTERIAS
+
+Un grupo de investigadores está interesado en analizar la asociación entre la red de apoyo social y el número de bacterias intestinales en una muestra de individuos longevos en la Zona Azul de Costa Rica en la Península de Nicoya.
+
+Para esto se tomaron en cuenta las siguientes variables predictoras:
+
+  + alim: el número de personas que acompañan a comer al adulto mayor.
+  
+  +	relig: el número de personas que acompañan a actividades religiosas (ir a la iglesia) al adulto mayor.
+  
+  +	salud: el número de personas que acompañan a los servicios de salud al adulto mayor.
+  
+  +	conversac: el número de personas con las que mantiene conversaciones el adulto mayor.
+  
+Además, se cuenta con 6 variables respuesta (Actinobacteriota, Bacteroidota, Verrucomicrobiota, *Firmicutes*, Proteobacteria, Spirochaetota) las cuáles son diferentes tipos de bacterias intestinales. Cada una de esas variables se refiere al número de bacterias presentes en la muestra fecal recolectada de cada adulto mayor.
+
+Adicionalmente, se toma en cuenta la variable Total_reads que se refiere al total de bacterias presentes en la muestra sin discriminar por tipo de bacteria. Se añade porque el número de bacterias que presenta cada individuo es distinto.
+
+Los datos están en el archivo `bacterias.Rdata`
+
+```{r}
+load('bacterias.Rdata')
+```
+
+
+a.	Tome alguna de las variables respuesta y haga el análisis para determinar cuáles de las variables predictoras están relacionadas con el número de bacterias.  Haga el análisis sin tomar en cuenta el total de bacterias y también tomándolo en cuenta.
+
+## Sin tomar en cuenta el total de bacterias
+
+```{r}
+# Nos enfrentamos a conteos primero observamos los datos
+
+head(bacterias)
+
+bacterias %>% 
+  summarise(
+    media = mean(Firmicutes),
+    
+    varianza = var(Firmicutes),
+    
+    desvest = sd(Firmicutes)
+  )
+
+boxplot(bacterias$Firmicutes)
+
+# Podemos observar que la media es bastante diferente que la varianza
+
+xyplot(Firmicutes ~ alim, type = c("p", "r"), data = bacterias)
+
+xyplot(Firmicutes ~ relig, type = c("p", "r"), data = bacterias)
+
+xyplot(Firmicutes ~ salud, type = c("p", "r"), data = bacterias)
+
+xyplot(Firmicutes ~ conversac, type = c("p", "r"), data = bacterias)
+
+# En general, la relación es lineal pero no parece ser fuerte
+
+mod <- glm(Firmicutes ~ alim + relig + salud + conversac, family = quasipoisson, data = bacterias)
+
+mod1 <- glm(Firmicutes ~ alim + relig + salud + conversac, family = poisson, data = bacterias)
+
+
+summary(mod)$disp
+
+# Podemos observar que el parámetro es por lejos estar cerca de 1. Hacemos las pruebas de hipotesis de equidispersión
+
+dispersiontest(mod1, trafo = 1)
+
+# Se rechaza la hipótesis nula para el modelo quasipoisson
+
+dispersiontest(mod1, trafo = 2)
+
+# También se rechaza para la binomial negativa, lo que indica que se puede usar cualquiera de los dos, para esto, vamos a proceder utilizando el modelo quasipoisson
+
+drop1(mod, test = 'F')
+
+mod <- update(mod, .~.-relig)
+
+drop1(mod, test = 'F')
+
+mod <- update(mod, .~.-alim)
+
+drop1(mod, test = 'F')
+
+mod <- update(mod, .~.-salud)
+
+drop1(mod, test = 'F')
+
+# Podemos observar que ninguna variable salió significativa
+
+# Podemos repetir con otra variable respuesta
+
+bacterias %>% 
+  summarise(
+    media = mean(Verrucomicrobiota),
+    
+    varianza = var(Verrucomicrobiota),
+    
+    desvest = sd(Verrucomicrobiota)
+  )
+
+boxplot(bacterias$Verrucomicrobiota)
+
+# En este caso, tenemos un valor super extremo, lo vamos a eliminar
+
+bacterias1 <- subset(bacterias, Verrucomicrobiota < 10000)
+
+boxplot(bacterias1$Verrucomicrobiota)
+
+# Podemos observar que la media es bastante diferente que la varianza
+
+scatterplot(Verrucomicrobiota ~ alim, pch = 18, data = bacterias1)
+
+scatterplot(Verrucomicrobiota ~ relig, pch = 18, data = bacterias1)
+
+scatterplot(Verrucomicrobiota ~ salud, pch = 18, data = bacterias1)
+
+scatterplot(Verrucomicrobiota ~ conversac, pch = 18, data = bacterias1)
+
+# En general, la relación es lineal pero no parece ser fuerte
+
+mod <- glm(Verrucomicrobiota ~ alim + relig + salud + conversac, family = quasipoisson, data = bacterias1)
+
+mod1 <- glm(Verrucomicrobiota ~ alim + relig + salud + conversac, family = poisson, data = bacterias1)
+
+
+summary(mod)$disp
+
+# Podemos observar que el parámetro es por lejos estar cerca de 1. Hacemos las pruebas de hipotesis de equidispersión
+
+dispersiontest(mod1, trafo = 1)
+
+# Se rechaza la hipótesis nula para el modelo quasipoisson
+
+dispersiontest(mod1, trafo = 2)
+
+# También se rechaza para la binomial negativa, lo que indica que se puede usar cualquiera de los dos, para esto, vamos a proceder utilizando el modelo quasipoisson
+
+drop1(mod, test = 'F')
+
+mod <- update(mod, .~.-relig)
+
+drop1(mod, test = 'F')
+
+mod <- update(mod, .~.-salud)
+
+drop1(mod, test = 'F')
+
+mod <- update(mod, .~.-conversac)
+
+drop1(mod, test = 'F')
+
+# Podemos repetir con otra variable respuesta
+
+bacterias %>% 
+  summarise(
+    media = mean(Bacteroidota),
+    
+    varianza = var(Bacteroidota),
+    
+    desvest = sd(Bacteroidota)
+  )
+
+boxplot(bacterias$Bacteroidota)
+
+# Podemos observar que la media es bastante diferente que la varianza
+
+scatterplot(Bacteroidota ~ alim, pch = 18, data = bacterias)
+
+scatterplot(Bacteroidota ~ relig, pch = 18, data = bacterias)
+
+scatterplot(Bacteroidota ~ salud, pch = 18, data = bacterias)
+
+scatterplot(Bacteroidota ~ conversac, pch = 18, data = bacterias)
+
+# En general, la relación es lineal parece ser media la fuerza de la relación
+
+mod <- glm(Bacteroidota ~ alim + relig + salud + conversac, family = quasipoisson, data = bacterias)
+
+mod1 <- glm(Bacteroidota ~ alim + relig + salud + conversac, family = poisson, data = bacterias)
+
+
+summary(mod)$disp
+
+# Podemos observar que el parámetro es por lejos estar cerca de 1. Hacemos las pruebas de hipotesis de equidispersión
+
+dispersiontest(mod1, trafo = 1)
+
+# Se rechaza la hipótesis nula para el modelo quasipoisson
+
+dispersiontest(mod1, trafo = 2)
+
+# También se rechaza para la binomial negativa, lo que indica que se puede usar cualquiera de los dos, para esto, vamos a proceder utilizando el modelo quasipoisson
+
+drop1(mod, test = 'F')
+
+mod <- update(mod, .~.-alim)
+
+drop1(mod, test = 'F')
+
+mod <- update(mod, .~.-conversac)
+
+drop1(mod, test = 'F')
+
+mod <- update(mod, .~.-relig)
+
+drop1(mod, test = 'F')
+
+# Encontramos que la variable salud es significativa
+```
+
++ El modelo final es:
+
+$$log(\lambda_{Salud})=\beta_0+\beta_1Salud$$
+```{r}
+betas <- mod$coefficients
+
+exp(-betas[2])
+
+exp(confint(mod)[2,])
+
+
+```
+
++ Por cada persona menos que acompaña a un adulto mayor, tienen en promedio 1.20 veces más bacterias Bacteroidota.
+
++ Con un 95% de confianza, se puede decir que un aumento de 1 persona en el número de persona que lo acompañan a los servicios de salud, disminuye el promedio de Bacteroidota entre 7 y 27%. 
+
+## ahora incluimos la variable de bacterias totales
+
+```{r}
+scatterplot(Bacteroidota ~ Total_reads, pch = 18, data = bacterias)
+
+# Parece ser que hay una relación lineal y positiva para total de bacterias. 
+mod3 <- glm(Bacteroidota ~ alim + relig + salud + conversac + Total_reads, family = poisson, data = bacterias)
+
+mod4 <- glm(Bacteroidota ~ alim + relig + salud + conversac + + Total_reads, family = quasipoisson, data = bacterias)
+
+summary(mod4)$disp
+
+dispersiontest(mod3, trafo = 1)
+dispersiontest(mod3, trafo = 2)
+
+#podemos usar un modelo quasi o BN
+
+drop1(mod4, test = 'F')
+
+mod4 <- update(mod4, .~.-conversac)
+
+drop1(mod4, test = 'F')
+
+mod4 <- update(mod4, .~.-alim)
+
+drop1(mod4, test = 'F')
+
+mod4 <- update(mod4, .~.-relig)
+
+drop1(mod4, test = 'F')
+
+# Quedamos con este modelo final, donde se incluye la salud y el total de bacterias
+```
+
+
+$$log(\lambda_{Salud})=\beta_0+\beta_1Salud+\beta_2Total$$
+
+b.	Haga el análisis usando un modelo lineal con distribución condicional normal y compare los resultados.
+
+```{r}
+mod5 <- lm(Bacteroidota ~ alim + relig + salud + conversac, data = bacterias)
+
+qqPlot(mod5)
+```
+
++ Podemos observar una panza
+
+```{r}
+logbac = log(bacterias$Bacteroidota)
+
+mod6 = lm(logbac ~ alim + relig + salud + conversac, data = bacterias)
+
+qqPlot(mod6)
+```
+
++ mejora un poco, pero no lo mejor.
+
+```{r}
+plot(mod6$residuals ~ mod6$fitted.values)
+```
+
++ por el gráfico parece no haber heterocedasticidad
+
+```{r}
+library(lmtest)
+
+bptest(mod6, studentize = F)
+```
+
++ No se rechaza la hipótesis de homocedasticidad, se asume que las varianzas son iguales. 
+
+```{r}
+drop1(mod6, test = "F")
+
+mod6 <- update(mod6, .~.-conversac)
+
+drop1(mod6, test = "F")
+
+mod6 <- update(mod6, .~.-alim)
+
+drop1(mod6, test = "F")
+
+mod6 <- update(mod6, .~.-relig)
+
+drop1(mod6, test = "F")
+
+```
+
++ Salud sigue siendo la variable significativa.
+
