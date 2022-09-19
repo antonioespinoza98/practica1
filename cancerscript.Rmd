@@ -1,0 +1,212 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# CANCER
+
+Se cuenta con datos de incidencia de cáncer de pulmón en 4 ciudades danesas en el período de 1968-1971. El propósito del ejercicio es analizar si la incidencia de cáncer está relacionada con la edad.
+Los datos están en el archivo `cancer.Rdata`
+
+```{r}
+load('cancer.Rdata')
+```
+
+
+a.	Observe que la variable edad es categórica pues se ha resumido en grupos de edad.  Para el análisis se quiere usar la edad de forma numérica y para esto es necesario usar los puntos medios de cada intervalo.  Haga la transformación de la variable edad.
+
+```{r}
+head(base)
+
+base$edad1 = 47.5 * (base$edad == "40-54") + 57.5 * (base$edad == "55-59") +
+  62.5 * (base$edad == "60-64") + 67.5 * (base$edad == "65-69") +
+  72.5 * (base$edad == "70-74") + 77.5 * (base$edad == "75+")
+
+table(base$edad, base$edad1)
+```
+
+
+b.	Observe gráficamente cómo se comportan de los datos. 
+
+```{r}
+boxplot(casos ~ ciudad, data = base)
+
+library(dplyr)
+
+base %>% group_by(ciudad) %>% summarise(media = mean(casos), varianza = var(casos))
+```
+
+```{r}
+library(lattice)
+
+xyplot(casos ~ edad1|ciudad, type = c('p','r'), data = base)
+
+xyplot(casos ~ edad1, type = c('p','r'), data = base)
+```
+
++ En el boxplot se observa que las medias andan parecido, no hay mucha diferencia entre las ciudades, lo que si se observa que hay gran diferencia es en la varianza, podemos observar que para la ciudad de *Horsens* la varianza es mucho mayor, más alta que su media. 
+
+c.	Ajuste un modelo de Poisson para el número de casos de cáncer, usando la edad como variable independiente.  Debe analizar si hay sobredispersión.  Determine si hay un crecimiento del número de casos asociado a la edad.  Piense cuál es el papel de la ciudad.
+
+```{r}
+mod  = glm(casos ~ edad1*ciudad, family = quasipoisson, data = base)
+
+summary(mod)$disp
+
+mod1 = glm(casos ~ edad1*ciudad, family = poisson, data = base)
+
+summary(mod1)$disp
+
+# podemos observar que el parámetro es igual a 1, procedemos a hacer las pruebas correspondientes
+
+library(AER)
+
+dispersiontest(mod1, trafo = 1)
+dispersiontest(mod1, trafo = 2)
+
+# No hya suficiente evidencia estadística para rechazar la hipótesis se asume que hay equidispersión
+
+drop1(mod1, test = 'LRT')
+
+# Parece ser que la interacción no es significativa
+
+mod1 <- update(mod, .~.-edad1:ciudad)
+
+drop1(mod1, test = 'LRT')
+
+# De acuerdo con la probabilidad asociada, parece ser que no es significativo, por lo que no hay suficiente evidencia para concluir que un aumento de edad haya un aumento en los casos
+```
+
+
+d.	Incluya la población y haga el análisis gráfico.
+
+```{r}
+# Primero creamos la tasa
+
+base$tasa = base$casos / base$pob
+
+xyplot(tasa ~ edad1 | ciudad, type = c("p", "r"), data = base)
+
+xyplot(tasa ~ edad1, type = c("p", "r"), data = base)
+```
+
++ Ahora si podemos ver que cómo al aumentar la edad aumenta la tasa de incidencia de cáncer. Tanto de forma general como para cada ciudad. 
+
+e.	Escriba el modelo de Poisson para la tasa de incidencia de cáncer. 
+
+$$log(E[Y_{i,j,edad}])=\beta_0+\beta_1Edad+ \tau_i+log(n_j)$$
+
+
+f.	Ajuste el modelo. Determine si hay un crecimiento en la tasa de incidencia asociado con la edad.  Note la diferencia en los resultados con respecto al análisis anterior.
+
+```{r}
+mod2 <- glm(casos ~ offset(log(pob)) + edad1*ciudad, family = quasipoisson, data = base)
+
+mod3 <- glm(casos ~ offset(log(pob)) + edad1*ciudad, family = poisson, data = base)
+
+summary(mod2)$disp
+
+# En este caso podemos observar que el parámetro es lejano a 1, lo cual indica que no se cumple la media igual  a la varianza
+
+dispersiontest(mod3, trafo = 1)
+
+dispersiontest(mod3, trafo = 2)
+
+# Para ambos casos se rechaza la hipótesis nula, lo que indica que hay sobredispersión y se utiliza el modelo quasi
+
+drop1(mod2, test = 'LRT')
+
+# La interacción parece no ser significativa
+
+mod3 <- update(mod3, .~.-edad1:ciudad)
+
+drop1(mod3, test = 'LRT')
+
+dispersiontest(mod3, trafo = 1)
+
+# No se rechaza la hipótesis nula
+
+dispersiontest(mod3, trafo = 2)
+
+# Se rechaza la hipótesis nula, se continúa con un modelo binomial negativo
+
+# Se asume que el crecimeinto de la tasa promedio de casos al aumentar la edad es el mismo en todas las ciudades. 
+```
+
+
+g.	Interprete el coeficiente de la edad por un aumento razonable de la edad.
+
+```{r}
+library(MASS)
+
+mod4 <- glm.nb(casos ~ offset(log(pob)) + edad1 + ciudad, data = base)
+
+drop1(mod4, test = 'LRT')
+
+# Al aumentar la edad si se tiene un aumenta de la tasa de incidencia promedio
+
+base %>% summarise(
+  desvest = sd(edad1)
+  )
+
+betas <- mod4$coefficients
+
+exp(10 * betas[2])
+```
+
++ Por cada 10 años más de edad, la tasa de incidencia de cáncer es 70% mayor. 
+
+h.	Haga un intervalo de confianza para el coeficiente de edad e interprételo por un aumento razonable de la edad.
+
+```{r}
+confint(mod4)
+```
+
+```{r}
+exp(confint(mod4)[2,] * 10)
+```
+
++ Se puede esperar con 95% de confianza que al aumentar la edad en 10 años, la tasa de incidencia aumente entre 1.39 y 2.09 veces. 
+
+i.	Se puede esperar una diferencia en la tasa promedio entre ciudades?
+
++ La prueba de hipótesis referente a la igualdad de promedios entre ciudades no se rechazó, por que no hay evidencia de que haya diferencia entre ciudades en la tasa de incidencia promedio.
+
+j.	Escriba el modelo final (no se está pidiendo las estimaciones sino el modelo que se usa).
+
+$$log(\lambda{Edad,i,j})=\beta_0+\beta_1Edad+\tau_i+log(n_j)$$
+
+k.	Calcule la potencia que se tiene en este experimento para ver diferencia entre ciudades de al menos un 20% en las medias de la tasa de incidencia.  Hágalo usando una distribución Poisson.
+
+```{r}
+library(pwr)
+
+power.anova.test(n = 5, groups = 4, between.var = var(mu), within.var = 1)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
